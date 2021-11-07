@@ -130,9 +130,53 @@ from PROGRAM
 true, delimiter ";");
 
 
-select * from customers limit 5;
-select * from formula limit 5;
-select * from subscriptions limit 5;
-select * from delivery limit 5;
-select * from complaints limit 5;
-select * from credit limit 5;
+
+-- Customer with maximum number of entries in Complaints Table 
+--are more likely to churn out
+select count(CustomerID) as NumComplaints, CustomerID  from complaints
+GROUP BY CustomerID
+ORDER BY NumComplaints DESC;
+
+-- Customers associated with the Product IDs with maximum numbers of 
+-- complaints are likely to churn out
+select count(ProductID), ProductID from complaints GROUP BY ProductID;
+
+-- Customers with NULL Renewal date in Subscription table are more likely
+-- to churn out
+select count(*) from subscriptions where RenewalDate is NULL;
+select count(*) from subscriptions;
+
+
+-- Reference Date 2010-01-05
+-- These are customers who have churned
+select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where customerid not in (   select customerid 
+                                    from subscriptions 
+                                    where '2010-01-05' between startdate and enddate ) -- Active Subscriptions
+     ) as churnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) ; -- filter out customers who joined after the reference date
+
+
+-- These are customers who have NOT churned
+select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where '2010-01-05' between startdate and enddate -- Active Subscriptions
+     ) as NotChurnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) ; -- filter out customers who joined after the reference date
+
+-- 364 Churn
+-- 1004 Not Churn
+
+-- Next Steps
+-- Data Engineering to find predictors of Churn
+-- 
+
