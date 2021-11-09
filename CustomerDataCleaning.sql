@@ -235,3 +235,25 @@ left outer join (select customerid, sum(totalprice) as TotalPaid
                  group by customerid) as TotalPaidTbl
 on churnTbl.customerid = TotalPaidTbl.customerid
 ;
+
+-- creating a model table from the above query for easy access in python
+drop table if exists modelTbl ;
+create table modelTbl as (
+    select churnTbl.customerid, churn, NumProducts, CustomerLifetime, NumSubscriptions, TotalPaid from churnTbl 
+    left outer join (select customerid, count(distinct(productid)) as NumProducts
+                    from subscriptions 
+                    group by customerid) as NumProdTbl
+    on churnTbl.customerid = NumProdTbl.customerid 
+    left outer join (select customerid, max(enddate) - min(startdate) as CustomerLifetime 
+                    from subscriptions 
+                    group by customerid) as CustomerLifetimeTbl
+    on churnTbl.customerid = CustomerLifetimeTbl.customerid
+    left outer join (select customerid, count(distinct(subscriptionid)) as NumSubscriptions 
+                    from subscriptions 
+                    group by customerid) as NumSubscriptionsTbl
+    on churnTbl.customerid = NumSubscriptionsTbl.customerid 
+    left outer join (select customerid, sum(totalprice) as TotalPaid 
+                    from subscriptions 
+                    group by customerid) as TotalPaidTbl
+    on churnTbl.customerid = TotalPaidTbl.customerid
+) ;
