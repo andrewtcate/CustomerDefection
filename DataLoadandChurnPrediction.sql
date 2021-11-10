@@ -43,6 +43,8 @@ from PROGRAM
 'curl "http://ballings.co/hidden/aCRM/data/chapter6/formula.txt"' with (format csv, header
 true, delimiter ";");
 
+select * from formula;
+
 -- Subscriptions Table creation
 
 create table subscriptions (
@@ -74,6 +76,8 @@ from PROGRAM
 'curl "http://ballings.co/hidden/aCRM/data/chapter6/subscriptions.txt"' with (format csv, header
 true, delimiter ";");
 
+select * from subscriptions; 
+--WHERE TotalDiscount > 0;
 
 
 create table delivery (
@@ -86,11 +90,15 @@ create table delivery (
     EndDate date
 ) ;
 
+drop table delivery;
+
 copy delivery
 from PROGRAM
 'curl "http://ballings.co/hidden/aCRM/data/chapter6/delivery.txt"' with (format csv, header
 true, delimiter ";");
 
+-- 100 subscription delivery is impact due to NPA
+select * from delivery where DeliveryContext = 'NPA' AND StartDate < '20100105';
 
 
 -- Complaints
@@ -113,6 +121,7 @@ true, delimiter ";");
 
 
 -- Credit
+drop table credit;
 
 create table credit (
     CreditID text,
@@ -124,7 +133,9 @@ create table credit (
     NbrNewspapers smallint
 ) ;
 
-
+--779 subscriptions received complaint credit but we see 364 customers churn 
+-- need to do further deep dive on churn at subscription level
+select * from credit where CreditScore = 'COM' AND ProcessingDate < '2010-01-05';
 
 copy credit
 from PROGRAM
@@ -134,18 +145,90 @@ true, delimiter ";");
 
 -- Churning Algorithm
 
-select * from complaints;
-
+select * from complaints where complaintDate < '2010-01-05' AND
 -- Customer with maximum number of entries in Complaints Table 
 --are more likely to churn out
-select count(CustomerID), CustomerID  from complaints
-GROUP BY CustomerID, ProductID;
+--select count(CustomerID) as NumComplaints, CustomerID  from complaints
+--where complaintDate < '2010-01-05'
+--GROUP BY CustomerID
+--ORDER BY NumComplaints DESC;
+customerID IN (
+    select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where customerid not in (   select customerid 
+                                    from subscriptions 
+                                    where '2010-01-05' between startdate and enddate ) -- Active Subscriptions
+     ) as churnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) -- filter out customers who joined after the reference date
+);
+
 
 -- Customers associated with the Product IDs with maximum numbers of 
 -- complaints are likely to churn out
-select count(ProductID), ProductID, from complaints GROUP BY ProductID;
+select count(ProductID) as ProductCount, ProductID from complaints 
+where complaintDate < '2010-01-05'
+--GROUP BY ProductID;
+--SELECT * from complaints where ProductID = '8' 
+--AND complaintDate < '2010-01-05';
+AND customerID IN (
+    select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where customerid not in (   select customerid 
+                                    from subscriptions 
+                                    where '2010-01-05' between startdate and enddate ) -- Active Subscriptions
+     ) as churnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) -- filter out customers who joined after the reference date
+)
+GROUP BY ProductID;
 
--- Customers with NULL Renewal date in Subscription table are more likely
--- to churn out
-select count(*) from subscriptions where RenewalDate is NULL;
-select count(*) from subscriptions;
+
+
+--Master Table
+-- CustomerID
+-- ProductID
+-- Churnflag
+-- SubscriptionCount
+-- CustomerLifeTime
+-- ProductsperCustomer
+-- TotalPrice by Customer
+
+
+-- Reference Date 2010-01-05
+-- These are customers who have churned
+select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where customerid not in (   select customerid 
+                                    from subscriptions 
+                                    where '2010-01-05' between startdate and enddate ) -- Active Subscriptions
+     ) as churnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) ; -- filter out customers who joined after the reference date
+
+
+-- These are customers who have NOT churned
+select distinct customerid 
+from (  select customerid 
+        from subscriptions 
+        where '2010-01-05' between startdate and enddate -- Active Subscriptions
+     ) as NotChurnTbl -- Select customerid which do not have an active subscription at 2010-01-05
+where customerid not in (select customerid 
+                         from (select customerid, min(startdate) ,min(startdate) > '2010-01-05' as AfterReference 
+                               from subscriptions group by customerid) as AfterReferenceTbl -- customers who joined after the reference date
+                         where AfterReference = True) ; -- filter out customers who joined after the reference date
+
+-- 364 Churn
+-- 1004 Not Churn
+
+-- Next Steps
+-- Data Engineering to find predictors of Churn
