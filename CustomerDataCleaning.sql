@@ -257,3 +257,5 @@ create table modelTbl as (
                     group by customerid) as TotalPaidTbl
     on churnTbl.customerid = TotalPaidTbl.customerid
 ) ;
+
+-- remove customerid before sending to python
