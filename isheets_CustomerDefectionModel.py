@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 database = {
             'user' : 'postgres',
-            'pass' : 'book',
+            'pass' : '100Million',
             'name' : 'postgres',
             'host' : 'localhost',
             'port' : '5432'}
@@ -28,12 +28,11 @@ pgConnection.close()
 print(result)
 
 x = result.drop('churn',axis = 1)
-x = x.drop('customerid',axis = 1)
 y = result.churn
 
 x_train, x_test, y_train, y_test = train_test_split(x, y, random_state=4)
 
-logistic_regression = LogisticRegression()
+logistic_regression = LogisticRegression(max_iter = 10000)
 
 logistic_regression.fit(x_train,y_train)
 

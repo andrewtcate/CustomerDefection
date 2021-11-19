@@ -135,7 +135,8 @@ create table credit (
 
 --779 subscriptions received complaint credit but we see 364 customers churn 
 -- need to do further deep dive on churn at subscription level
-select * from credit where CreditScore = 'COM' AND ProcessingDate < '2010-01-05';
+select * from credit left outer join subscriptions on credit.subscriptionid = subscriptions.subscriptionid
+where CreditScore = 'COM' AND ProcessingDate < '2010-01-05' ;
 
 copy credit
 from PROGRAM
@@ -169,11 +170,11 @@ where customerid not in (select customerid
 
 -- Customers associated with the Product IDs with maximum numbers of 
 -- complaints are likely to churn out
-select count(ProductID) as ProductCount, ProductID from complaints 
+select ProductID ,count(ProductID) as ProductCount from complaints 
 where complaintDate < '2010-01-05'
---GROUP BY ProductID;
---SELECT * from complaints where ProductID = '8' 
---AND complaintDate < '2010-01-05';
+-- GROUP BY ProductID;
+-- SELECT * from complaints where ProductID = '8' 
+-- AND complaintDate < '2010-01-05';
 AND customerID IN (
     select distinct customerid 
 from (  select customerid 
@@ -189,6 +190,7 @@ where customerid not in (select customerid
 )
 GROUP BY ProductID;
 
+select productid, count(productid) from subscriptions group by productid;
 
 
 --Master Table
