@@ -215,6 +215,11 @@ select customerid, count(distinct(subscriptionid)) as NumSubscriptions from subs
 -- Total Price paid by each customer
 select customerid, sum(totalprice) as TotalPaid from subscriptions group by customerid ;
 
+-- Number of Times a customer was credited and Total Amount recieved
+select customerid, sum(amount) as TotalCredit, count(creditid) as NumCredits from credit left outer join subscriptions on credit.subscriptionid = subscriptions.subscriptionid
+where CreditScore = 'COM' AND ProcessingDate < '2010-01-05' 
+group by customerid;
+
 
 -- Merging churn table with predictors, this table we can use for modeling
 select churnTbl.customerid, churn, NumProducts, CustomerLifetime, NumSubscriptions, TotalPaid from churnTbl 
@@ -239,7 +244,7 @@ on churnTbl.customerid = TotalPaidTbl.customerid
 -- creating a model table from the above query for easy access in python
 drop table if exists modelTbl ;
 create table modelTbl as (
-    select churnTbl.customerid, churn, NumProducts, CustomerLifetime, NumSubscriptions, TotalPaid from churnTbl 
+    select churnTbl.customerid, churn, NumProducts, CustomerLifetime, NumSubscriptions, TotalPaid, TotalCredit, NumCredits, NumComplaints from churnTbl 
     left outer join (select customerid, count(distinct(productid)) as NumProducts
                     from subscriptions 
                     group by customerid) as NumProdTbl
@@ -256,4 +261,43 @@ create table modelTbl as (
                     from subscriptions 
                     group by customerid) as TotalPaidTbl
     on churnTbl.customerid = TotalPaidTbl.customerid
+    left outer join (select customerid, sum(amount) as TotalCredit, count(creditid) as NumCredits 
+                     from credit 
+                     left outer join subscriptions 
+                     on credit.subscriptionid = subscriptions.subscriptionid
+                     where CreditScore = 'COM' AND ProcessingDate < '2010-01-05' 
+                     group by customerid) as creditTbl
+    on churnTbl.customerid = creditTbl.customerid
+    left outer join (select customerid, count(complaintid) as NumComplaints  
+                     from complaints 
+                     where complaintDate < '2010-01-05'
+                     group by customerid) as NumComplaintsTbl
+    on churnTbl.customerid = NumComplaintsTbl.customerid
 ) ;
+
+update modelTbl set totalcredit = 0
+where totalcredit is null;
+
+update modelTbl set numcredits = 0
+where numcredits is null;
+
+update modelTbl set numcomplaints = 0
+where numcomplaints is null ;
+
+alter table modelTbl
+    add column badproduct boolean ;
+
+update modelTbl set badproduct = TRUE
+where customerid in (select customerid from subscriptions where productid = '4') ;
+
+update modelTbl set badproduct = FALSE
+where badproduct is null ;
+
+
+-- remove customerid before sending to python
+
+alter table modeltbl
+    drop column customerid ;
+
+
+select * from modelTbl ;
